@@ -1,30 +1,64 @@
 package com.example.safewatch.ui.screens
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safewatch.ui.theme.*
+import com.google.firebase.FirebaseException
+import com.google.firebase.auth.*
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
-    var isOtpSent by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = context as Activity
+    val auth = FirebaseAuth.getInstance()
+
     var phoneNumber by remember { mutableStateOf("") }
-    var isRegister by remember { mutableStateOf(false) }
+    var otpCode by remember { mutableStateOf("") }
+    var isOtpSent by remember { mutableStateOf(false) }
+    var verificationId by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+        override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+            // Auto-retrieval or instant verification
+            auth.signInWithCredential(credential).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onLoginSuccess()
+                }
+            }
+        }
+
+        override fun onVerificationFailed(e: FirebaseException) {
+            isLoading = false
+            Toast.makeText(context, e.message, Toast.LENGTH_LONG).show()
+        }
+
+        override fun onCodeSent(id: String, token: PhoneAuthProvider.ForceResendingToken) {
+            verificationId = id
+            isOtpSent = true
+            isLoading = false
+            Toast.makeText(context, "OTP Sent", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -35,7 +69,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     ) {
         Spacer(modifier = Modifier.height(40.dp))
         
-        // Logo
         Icon(
             imageVector = Icons.Default.Shield,
             contentDescription = null,
@@ -46,7 +79,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         
         Text(
-            text = if (isRegister) "Create Account" else "Welcome Back",
+            text = if (isOtpSent) "Verify OTP" else "Welcome Back",
             style = MaterialTheme.typography.displaySmall,
             color = Color.White
         )
@@ -63,12 +96,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(48.dp))
 
         if (!isOtpSent) {
-            // Phone Number Input
             OutlinedTextField(
                 value = phoneNumber,
-                onValueChange = { phoneNumber = it },
+                onValueChange = { if (it.length <= 10) phoneNumber = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Phone Number") },
+                placeholder = { Text("Phone Number", color = TextSecondary) },
                 leadingIcon = {
                     Row(
                         modifier = Modifier.padding(start = 12.dp, end = 8.dp),
@@ -94,85 +126,74 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             
             Button(
-                onClick = { isOtpSent = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = {
+                    if (phoneNumber.length == 10) {
+                        isLoading = true
+                        val options = PhoneAuthOptions.newBuilder(auth)
+                            .setPhoneNumber("+91$phoneNumber")
+                            .setTimeout(60L, TimeUnit.SECONDS)
+                            .setActivity(activity)
+                            .setCallbacks(callbacks)
+                            .build()
+                        PhoneAuthProvider.verifyPhoneNumber(options)
+                    } else {
+                        Toast.makeText(context, "Enter valid 10-digit number", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = !isLoading,
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
-                Text("Send OTP", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                else Text("Send OTP", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         } else {
-            // OTP Input
-            Row(
+            OutlinedTextField(
+                value = otpCode,
+                onValueChange = { if (it.length <= 6) otpCode = it },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                repeat(6) { index ->
-                    OtpBox()
-                }
-            }
+                placeholder = { Text("6-Digit OTP", color = TextSecondary, textAlign = TextAlign.Center) },
+                textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontSize = 20.sp, letterSpacing = 8.sp, color = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = CardBackground,
+                    focusedContainerColor = CardBackground,
+                    unfocusedContainerColor = CardBackground
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
             
             Spacer(modifier = Modifier.height(32.dp))
             
             Button(
-                onClick = onLoginSuccess,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = {
+                    if (otpCode.length == 6) {
+                        isLoading = true
+                        val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
+                        auth.signInWithCredential(credential).addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                onLoginSuccess()
+                            } else {
+                                isLoading = false
+                                Toast.makeText(context, "Invalid OTP", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = !isLoading,
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
-                Text("Verify OTP", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                else Text("Verify OTP", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             
             TextButton(onClick = { isOtpSent = false }) {
                 Text("Edit Phone Number", color = SecondaryCyan)
             }
         }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = if (isRegister) "Already have an account?" else "Don't have an account?",
-                color = TextSecondary
-            )
-            TextButton(onClick = { isRegister = !isRegister }) {
-                Text(
-                    text = if (isRegister) "Login" else "Register",
-                    color = PrimaryBlue,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
     }
-}
-
-@Composable
-fun OtpBox() {
-    var text by remember { mutableStateOf("") }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { if (it.length <= 1) text = it },
-        modifier = Modifier
-            .size(50.dp)
-            .border(1.dp, CardBackground, RoundedCornerShape(12.dp)),
-        textStyle = LocalTextStyle.current.copy(
-            textAlign = TextAlign.Center,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        ),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = PrimaryBlue,
-            unfocusedBorderColor = CardBackground,
-            focusedContainerColor = CardBackground,
-            unfocusedContainerColor = CardBackground
-        ),
-        singleLine = true
-    )
 }

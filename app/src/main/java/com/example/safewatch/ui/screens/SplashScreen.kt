@@ -1,5 +1,6 @@
 package com.example.safewatch.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,14 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.safewatch.ui.theme.BackgroundDark
 import com.example.safewatch.ui.theme.PrimaryBlue
 import com.example.safewatch.ui.theme.SecondaryCyan
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(onNavigateToOnboarding: () -> Unit) {
+fun SplashScreen(onNextScreen: (String) -> Unit) {
+    val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -36,7 +40,20 @@ fun SplashScreen(onNavigateToOnboarding: () -> Unit) {
 
     LaunchedEffect(Unit) {
         delay(2000)
-        onNavigateToOnboarding()
+        
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            onNextScreen("home")
+        } else {
+            val sharedPref = context.getSharedPreferences("safewatch_prefs", Context.MODE_PRIVATE)
+            val onboardingCompleted = sharedPref.getBoolean("onboarding_completed", false)
+            
+            if (onboardingCompleted) {
+                onNextScreen("login")
+            } else {
+                onNextScreen("onboarding")
+            }
+        }
     }
 
     Box(
@@ -47,7 +64,6 @@ fun SplashScreen(onNavigateToOnboarding: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
-                // Pulse effect background
                 Box(
                     modifier = Modifier
                         .size(100.dp)

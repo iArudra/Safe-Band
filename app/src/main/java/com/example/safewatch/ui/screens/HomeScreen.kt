@@ -37,23 +37,29 @@ fun HomeScreen() {
 
     // Firebase Realtime Listener
     DisposableEffect(Unit) {
-        val database = FirebaseDatabase.getInstance()
-        val locationRef = database.getReference("device/location")
+        val database = FirebaseDatabase.getInstance("https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app")
+        // Updated path to "Device" with capital D to match your console screenshot
+        val locationRef = database.getReference("Device/location")
         
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val lat = snapshot.child("lat").getValue(Double::class.java) ?: 0.0
-                val lng = snapshot.child("lng").getValue(Double::class.java) ?: 0.0
-                val battery = snapshot.child("battery").getValue(Int::class.java) ?: 85
-                val spd = snapshot.child("speed").getValue(Double::class.java) ?: 0.0
-                
-                childLocation = LatLng(lat, lng)
-                batteryLevel = "$battery%"
-                speed = "${spd.toInt()} km/h"
-                lastUpdated = "Just now"
+                if (snapshot.exists()) {
+                    // Using a safer way to parse numbers (handles both Int and Double)
+                    val lat = snapshot.child("lat").value?.toString()?.toDoubleOrNull() ?: 0.0
+                    val lng = snapshot.child("lng").value?.toString()?.toDoubleOrNull() ?: 0.0
+                    val battery = snapshot.child("battery").value?.toString()?.toIntOrNull() ?: 0
+                    val spd = snapshot.child("speed").value?.toString()?.toDoubleOrNull() ?: 0.0
+                    
+                    childLocation = LatLng(lat, lng)
+                    batteryLevel = "$battery%"
+                    speed = "${spd.toInt()} km/h"
+                    lastUpdated = "Updated just now"
+                }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("Firebase", "Error: ${error.message}")
+            }
         }
         
         locationRef.addValueEventListener(listener)

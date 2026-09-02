@@ -1,5 +1,6 @@
 package com.example.safewatch.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,8 +63,15 @@ val pages = listOf(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onNavigateToLogin: () -> Unit) {
+    val context = LocalContext.current
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
+
+    val completeOnboarding = {
+        val sharedPref = context.getSharedPreferences("safewatch_prefs", Context.MODE_PRIVATE)
+        sharedPref.edit().putBoolean("onboarding_completed", true).apply()
+        onNavigateToLogin()
+    }
 
     Column(
         modifier = Modifier
@@ -74,7 +83,7 @@ fun OnboardingScreen(onNavigateToLogin: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
-            TextButton(onClick = onNavigateToLogin) {
+            TextButton(onClick = completeOnboarding) {
                 Text("Skip", color = TextSecondary)
             }
         }
@@ -112,7 +121,7 @@ fun OnboardingScreen(onNavigateToLogin: () -> Unit) {
                     if (pagerState.currentPage < pages.size - 1) {
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                     } else {
-                        onNavigateToLogin()
+                        completeOnboarding()
                     }
                 },
                 shape = RoundedCornerShape(12.dp),

@@ -32,8 +32,8 @@ fun MainNavigation(navController: NavHostController) {
         }
     ) {
         composable(Screen.Splash.route) {
-            SplashScreen(onNavigateToOnboarding = {
-                navController.navigate(Screen.Onboarding.route) {
+            SplashScreen(onNextScreen = { route ->
+                navController.navigate(route) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
             })

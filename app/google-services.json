@@ -1,20 +1,22 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "safewatch-placeholder",
-    "storage_bucket": "safewatch-placeholder.appspot.com"
+    "project_number": "811449572063",
+    "firebase_url": "https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "safe-band-7659f",
+    "storage_bucket": "safe-band-7659f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:0123456789abcdef",
+        "mobilesdk_app_id": "1:811449572063:android:fe13d68c7d018541f8e76a",
         "android_client_info": {
           "package_name": "com.example.safewatch"
         }
       },
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "placeholder_api_key"
+          "current_key": "AIzaSyD_qSVNCJ9aNeaXXCO4Nc3qC8ze7GUlDpQ"
         }
       ],
       "services": {
