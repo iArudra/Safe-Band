@@ -16,7 +16,10 @@ class AlertsFragment : Fragment() {
     private var _binding: FragmentAlertsBinding? = null
     private val binding get() = _binding!!
 
-    private val alertsRef = FirebaseDatabase.getInstance().getReference("device/alerts")
+    // Unified Firebase path — must match the Python backend
+    private val alertsRef = FirebaseDatabase.getInstance(
+        "https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app"
+    ).getReference("devices/band_001/alerts")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,

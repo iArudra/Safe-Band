@@ -34,9 +34,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var fenceEdgeMarker: Marker? = null
     private var geofenceCircle: Circle? = null
 
-    private val database = FirebaseDatabase.getInstance()
-    private val locationRef = database.getReference("device/location")
-    private val geofenceRef = database.getReference("device/geofence")
+    // Unified Firebase paths — must match the Python backend (a9g_relay.py / app.py)
+    private val database = FirebaseDatabase.getInstance(
+        "https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app"
+    )
+    private val locationRef = database.getReference("devices/band_001/location")
+    private val geofenceRef = database.getReference("devices/band_001/geofence")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -89,9 +92,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         viewLifecycleOwner.lifecycleScope.launch {
             while (isActive) {
                 locationRef.get().addOnSuccessListener { snapshot ->
-                    val lat = snapshot.child("latitude").getValue(Double::class.java)
-                    val lng = snapshot.child("longitude").getValue(Double::class.java)
-                    if (lat != null && lng != null) {
+                    // Using unified field names: lat / lng (matching Python backend)
+                    val lat = snapshot.child("lat").value?.toString()?.toDoubleOrNull()
+                    val lng = snapshot.child("lng").value?.toString()?.toDoubleOrNull()
+                    if (lat != null && lng != null && !(lat == 0.0 && lng == 0.0)) {
                         val deviceLatLng = LatLng(lat, lng)
                         updateDeviceLocation(deviceLatLng)
                     }
@@ -170,9 +174,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         val center = fenceCenterMarker?.position ?: return
         val radius = geofenceCircle?.radius ?: return
 
+        // Unified field names: lat / lng (matching Python backend and HomeScreen)
         val geofenceData = mapOf(
-            "latitude" to center.latitude,
-            "longitude" to center.longitude,
+            "lat" to center.latitude,
+            "lng" to center.longitude,
             "radius" to radius
         )
         geofenceRef.setValue(geofenceData)
@@ -180,8 +185,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun loadGeofenceFromFirebase() {
         geofenceRef.get().addOnSuccessListener { snapshot ->
-            val lat = snapshot.child("latitude").getValue(Double::class.java)
-            val lng = snapshot.child("longitude").getValue(Double::class.java)
+            // Unified field names: lat / lng
+            val lat = snapshot.child("lat").value?.toString()?.toDoubleOrNull()
+            val lng = snapshot.child("lng").value?.toString()?.toDoubleOrNull()
             val radius = snapshot.child("radius").getValue(Double::class.java)
 
             if (lat != null && lng != null && radius != null) {
