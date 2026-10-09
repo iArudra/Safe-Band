@@ -13,3 +13,22 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Secrets & Environment variables
+.env
+*.env
+*.json
+!app/google-services.json
+serviceAccount.json
+*serviceAccount*.json
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache & Logs
+__pycache__/
+*.py[cod]
+logs/
+.pytest_cache/

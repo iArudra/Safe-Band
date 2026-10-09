@@ -49,7 +49,9 @@ class SosDialogFragment : DialogFragment() {
 
         binding.btnAcknowledge.setOnClickListener {
             if (alertId != null) {
-                FirebaseDatabase.getInstance().getReference("device/alerts")
+                FirebaseDatabase.getInstance(
+                    "https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app"
+                ).getReference("devices/band_001/alerts")
                     .child(alertId)
                     .child("status")
                     .setValue("acknowledged")

@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────
+# Backend .gitignore
+# ──────────────────────────────────────────────
+
+# Environment / secrets — NEVER commit these
+.env
+*.env
+serviceAccount.json
+*serviceAccount*.json
+*firebase*.json
+*credentials*.json
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Logs
+logs/*.log
+logs/*.log.*
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
