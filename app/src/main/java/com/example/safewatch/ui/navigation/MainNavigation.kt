@@ -3,10 +3,11 @@ package com.example.safewatch.ui.navigation
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.safewatch.ui.screens.*
 import com.google.firebase.auth.FirebaseAuth
 
@@ -60,10 +61,30 @@ fun MainNavigation(navController: NavHostController) {
             })
         }
         composable(Screen.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                onNavigateToAlerts = { filter ->
+                    navController.navigate("alerts?filter=$filter")
+                },
+                onNavigateToGeoFence = {
+                    navController.navigate(Screen.GeoFence.route)
+                }
+            )
+        }
+        composable(
+            route = "alerts?filter={filter}",
+            arguments = listOf(
+                navArgument("filter") {
+                    type = NavType.StringType
+                    defaultValue = "All"
+                    nullable = true
+                }
+            )
+        ) { backStackEntry ->
+            val filter = backStackEntry.arguments?.getString("filter") ?: "All"
+            AlertsScreen(initialFilter = filter)
         }
         composable(Screen.Alerts.route) {
-            AlertsScreen()
+            AlertsScreen(initialFilter = "All")
         }
         composable(Screen.GeoFence.route) {
             GeoFenceScreen()

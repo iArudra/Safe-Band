@@ -1,8 +1,10 @@
 package com.example.safewatch.ui.screens
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,22 +17,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safewatch.ui.theme.*
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.database.*
 import com.google.maps.android.compose.*
 
 @Composable
-fun HomeScreen() {
-    var childLocation by remember { mutableStateOf(LatLng(1.35, 103.87)) }
+fun HomeScreen(
+    onNavigateToAlerts: (filter: String) -> Unit = {},
+    onNavigateToGeoFence: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    var childLocation by remember { mutableStateOf(LatLng(17.5062, 81.648)) }
     var batteryLevel by remember { mutableStateOf("85%") }
     var speed by remember { mutableStateOf("0 km/h") }
     var lastUpdated by remember { mutableStateOf("Just now") }
-    
+    var deviceStatus by remember { mutableStateOf("online") }
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(childLocation, 15f)
     }
@@ -38,38 +47,61 @@ fun HomeScreen() {
     // Firebase Realtime Listener
     DisposableEffect(Unit) {
         val database = FirebaseDatabase.getInstance("https://safe-band-7659f-default-rtdb.asia-southeast1.firebasedatabase.app")
-        // Updated path to "Device" with capital D to match your console screenshot
-        val locationRef = database.getReference("Device/location")
-        
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    // Using a safer way to parse numbers (handles both Int and Double)
-                    val lat = snapshot.child("lat").value?.toString()?.toDoubleOrNull() ?: 0.0
-                    val lng = snapshot.child("lng").value?.toString()?.toDoubleOrNull() ?: 0.0
-                    val battery = snapshot.child("battery").value?.toString()?.toIntOrNull() ?: 0
-                    val spd = snapshot.child("speed").value?.toString()?.toDoubleOrNull() ?: 0.0
-                    
-                    childLocation = LatLng(lat, lng)
-                    batteryLevel = "$battery%"
-                    speed = "${spd.toInt()} km/h"
-                    lastUpdated = "Updated just now"
-                }
-            }
 
-            override fun onCancelled(error: DatabaseError) {
-                android.util.Log.e("Firebase", "Error: ${error.message}")
+        val parseData = { snapshot: DataSnapshot ->
+            val lat = snapshot.child("latitude").value?.toString()?.toDoubleOrNull()
+                ?: snapshot.child("lat").value?.toString()?.toDoubleOrNull()
+            val lng = snapshot.child("longitude").value?.toString()?.toDoubleOrNull()
+                ?: snapshot.child("lng").value?.toString()?.toDoubleOrNull()
+            val battery = snapshot.child("battery").value?.toString()?.toIntOrNull()
+            val spd = snapshot.child("speed").value?.toString()?.toDoubleOrNull()
+            val st = snapshot.child("status").value?.toString()
+
+            if (lat != null && lng != null && (lat != 0.0 || lng != 0.0)) {
+                childLocation = LatLng(lat, lng)
             }
+            if (battery != null) {
+                batteryLevel = "$battery%"
+            }
+            if (spd != null) {
+                speed = "${spd.toInt()} km/h"
+            }
+            if (!st.isNullOrBlank()) {
+                deviceStatus = st
+            }
+            lastUpdated = "Just now"
         }
-        
-        locationRef.addValueEventListener(listener)
-        onDispose { locationRef.removeEventListener(listener) }
+
+        // Listeners for devices/safeband_001, device/location, Device/location
+        val ref1 = database.getReference("devices/safeband_001")
+        val listener1 = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) parseData(snapshot)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+
+        val ref2 = database.getReference("device/location")
+        val listener2 = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) parseData(snapshot)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+
+        ref1.addValueEventListener(listener1)
+        ref2.addValueEventListener(listener2)
+
+        onDispose {
+            ref1.removeEventListener(listener1)
+            ref2.removeEventListener(listener2)
+        }
     }
 
-    // Animate camera to child location when it changes
+    // Animate camera when child location updates
     LaunchedEffect(childLocation) {
         cameraPositionState.animate(
-            update = com.google.android.gms.maps.CameraUpdateFactory.newLatLng(childLocation),
+            update = CameraUpdateFactory.newLatLngZoom(childLocation, 15f),
             durationMs = 1000
         )
     }
@@ -90,19 +122,30 @@ fun HomeScreen() {
                 Text("Hello, Parent", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 Text("Child: Aarav", style = MaterialTheme.typography.titleLarge, color = Color.White)
             }
-            
+
+            val badgeColor = when (deviceStatus.lowercase()) {
+                "sos" -> DangerRed
+                "offline" -> TextSecondary
+                else -> SuccessGreen
+            }
+            val badgeText = when (deviceStatus.lowercase()) {
+                "sos" -> "SOS ALERT"
+                "offline" -> "Offline"
+                else -> "Safe (${deviceStatus.capitalize()})"
+            }
+
             Surface(
-                color = SuccessGreen.copy(alpha = 0.1f),
+                color = badgeColor.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen)
+                border = androidx.compose.foundation.BorderStroke(1.dp, badgeColor)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(8.dp).background(SuccessGreen, CircleShape))
+                    Box(modifier = Modifier.size(8.dp).background(badgeColor, CircleShape))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Safe", color = SuccessGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(badgeText, color = badgeColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
@@ -123,7 +166,7 @@ fun HomeScreen() {
             ) {
                 Marker(
                     state = rememberMarkerState(position = childLocation),
-                    title = "Aarav"
+                    title = "Aarav (${childLocation.latitude.toString().take(7)}, ${childLocation.longitude.toString().take(7)})"
                 )
             }
         }
@@ -144,7 +187,9 @@ fun HomeScreen() {
 
         // Geo-fence Status
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigateToGeoFence() },
             colors = CardDefaults.cardColors(containerColor = CardBackground),
             shape = RoundedCornerShape(20.dp)
         ) {
@@ -156,25 +201,55 @@ fun HomeScreen() {
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text("Inside Safe Zone", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Home & School", color = TextSecondary, style = MaterialTheme.typography.labelSmall)
+                    Text("Home & School - Tap to edit", color = TextSecondary, style = MaterialTheme.typography.labelSmall)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary)
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Quick Actions
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            QuickActionButton("SOS History", Icons.Default.Warning, Modifier.weight(1f))
-            QuickActionButton("Edit Fence", Icons.Default.EditLocation, Modifier.weight(1f))
-            QuickActionButton("Share", Icons.Default.Share, Modifier.weight(1f))
+            QuickActionButton(
+                label = "SOS History",
+                icon = Icons.Default.Warning,
+                modifier = Modifier.weight(1f),
+                onClick = { onNavigateToAlerts("SOS") }
+            )
+            QuickActionButton(
+                label = "Edit Fence",
+                icon = Icons.Default.EditLocation,
+                modifier = Modifier.weight(1f),
+                onClick = { onNavigateToGeoFence() }
+            )
+            QuickActionButton(
+                label = "Share",
+                icon = Icons.Default.Share,
+                modifier = Modifier.weight(1f),
+                onClick = { shareLocation(context, childLocation, deviceStatus) }
+            )
         }
     }
+}
+
+private fun shareLocation(context: Context, location: LatLng, status: String) {
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(
+            Intent.EXTRA_TEXT,
+            "SafeWatch - Aarav's Live Location:\nhttps://maps.google.com/?q=${location.latitude},${location.longitude}\nStatus: $status"
+        )
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Share Location Via"))
+}
+
+private fun String.capitalize(): String {
+    return this.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
 @Composable
@@ -197,12 +272,17 @@ fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier
 }
 
 @Composable
-fun QuickActionButton(label: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun QuickActionButton(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
     Surface(
         modifier = modifier.height(44.dp),
         color = CardBackground,
         shape = RoundedCornerShape(12.dp),
-        onClick = {}
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp),
